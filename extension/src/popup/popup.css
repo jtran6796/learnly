@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+body {
+	font-family: Arial, sans-serif;
+	margin: 0;
+	padding: 0;
+	width: 400px;
+	min-height: 500px;
+	background: #f5f5f5;
+}
+
+.title {
+	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+	color: white;
+	padding: 20px;
+	text-align: center;
+}
+
+.title h1 {
+	margin: 0;
+	font-size: 24px;
+}
+
+.tab-nav-container {
+	display: flex;
+	background: white;
+	border-bottom: 2px solid #ddd;
+	justify-content: center;
+}
+
+.tab-nav-container button {
+	flex: 1;
+	padding: 12px 8px;
+	border: none;
+	background: none;
+	cursor: pointer;
+	font-size: 13px;
+	transition: all 0.3s;
+}
+
+.tab-nav-active {
+	background: #667eea;
+	font-weight: 600;
+}
+
+.tab-nav-inactive {
+	color: #666;
+}
+
+.tab-nav-inactive:hover {
+	background: #f0f0f0;
+}
+
+.tab-close {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	border-radius: 3px;
+	font-size: 18px;
+	line-height: 1;
+	opacity: 0.5;
+	transition: all 0.2s;
+	margin-left: auto;
+}
+
+.tab-close:hover {
+	opacity: 1;
+	background: rgba(0, 0, 0, 0.1);
+	color: #d32f2f;
+}
+
+#Main,
+.alt-tab {
+	padding: 20px;
+	background: white;
+}
+
+.study-plan,
+.alarm {
+	margin-bottom: 20px;
+}

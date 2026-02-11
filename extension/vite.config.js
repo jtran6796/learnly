@@ -9,9 +9,9 @@ export default defineConfig({
 				background: resolve(__dirname, 'src/background/background.js'),
 			},
 			output: {
-				entryFileNames: '[name].js',
-				chunkFileNames: '[name].js',
-				assetFileNames: '[name].[ext]',
+				entryFileNames: '[name]/[name].js',
+				chunkFileNames: '[name]/[name].js',
+				assetFileNames: '[name]/[name].[ext]',
 				dir: 'dist'
 			}
 		},

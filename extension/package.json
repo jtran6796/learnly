@@ -2,31 +2,32 @@
   "name": "learnly",
   "version": "1.0.0",
   "description": "Personal learning accountability tool - A browser extension that generates daily LLM-powered trivia questions on software development topics, code tracing exercises, and tech articles to maintain consistent study habits and track progress through a custom learning roadmap.",
-  "main": "index.js",
-  "scripts": {
-    "dev": "vite build --watch",
-    "build": "vite build"
+  "keywords": [],
+  "homepage": "https://github.com/jtran6796/learnly#readme",
+  "bugs": {
+    "url": "https://github.com/jtran6796/learnly/issues"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/jtran6796/learnly.git"
   },
-  "keywords": [],
-  "author": "",
   "license": "ISC",
+  "author": "",
   "type": "module",
-  "bugs": {
-    "url": "https://github.com/jtran6796/learnly/issues"
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build"
   },
-  "homepage": "https://github.com/jtran6796/learnly#readme",
   "dependencies": {
     "@google/genai": "^1.40.0",
-    "@google/generative-ai": "^0.24.1",
-    "@tailwindcss/vite": "^4.1.18",
-    "dotenv": "^17.2.4",
-    "tailwindcss": "^4.1.18"
+    "@tailwindcss/postcss": "^4.1.18",
+    "@tailwindcss/vite": "^4.1.18"
   },
   "devDependencies": {
+    "autoprefixer": "^10.4.24",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.18",
     "vite": "^7.3.1"
   }
 }

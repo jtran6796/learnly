@@ -8,6 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
 	testBtn.addEventListener('click', async () => {
 		console.log('Generating Study Plan...');
 		const studyPlan = await generateStudyPlan('SYS-701');
-		alert(studyPlan || 'Failed')
+		console.log(studyPlan);
 	})
 })

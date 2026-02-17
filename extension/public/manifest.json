@@ -7,7 +7,7 @@
 		"default_popup": "./src/popup/popup.html"
 	},
 	"background": {
-		"service_worker": "./background/background.js"
+		"service_worker": "./src/background/background.js"
 	},
 	"permissions": [
 		"storage",

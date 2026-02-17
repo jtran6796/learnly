@@ -1,4 +1,5 @@
 import { generateStudyPlan } from '../utils/api.js'
+import './popup.css'
 
 document.addEventListener('DOMContentLoaded', () => {
 	const testBtn = document.createElement('button');

@@ -1,23 +1,42 @@
-<!DOCTYPE html>
+<!doctype html>
+<html>
+  <head>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
 
-<head>
-	<link rel="stylesheet" href="popup.css">
-	<script type="module" src="popup.js"></script>
-</head>
-
-<body>
-	<!--Tab Buttons-->
-	<div class="flex">
-		<button class="" data-tab="main">Main</button>
-		<button class="" data-tab="settings">Settings</button>
-		<button class="" data-tab="saved-plans">Saved Plans</button>
-		<button class="" data-tab="notes">Notes</button>
-	</div>
-	<h1>
-		Title
-	</h1>
-	<!--Tab Contents-->
-	<div>
-		<!--Input/Buttons-->
-	</div>
-</body>
+  <body>
+    <!--Tab Buttons-->
+    <div class="flex border-b bg-white">
+      <button
+        class="tab-button flex-1 px-4 py-3 border-b-2 border-yellow-500"
+        data-tab="Main"
+      >
+        Main
+      </button>
+      <button
+        class="tab-button flex-1 px-4 py-3 border-b-2 border-transparent"
+        data-tab="Settings"
+      >
+        Settings
+      </button>
+      <button
+        class="tab-button flex-1 px-4 py-3 border-b-2 border-transparent"
+        data-tab="Plans"
+      >
+        Plans
+      </button>
+      <button
+        class="tab-button flex-1 px-4 py-3 border-b-2 border-transparent"
+        data-tab="Chat"
+      >
+        Chat
+      </button>
+    </div>
+    <h1>Title</h1>
+    <!--Tab Contents-->
+    <div>
+      <!--Input/Buttons-->
+    </div>
+    <script type="module" src="./popup.js"></script>
+  </body>
+</html>

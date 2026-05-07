@@ -18,7 +18,10 @@ Question TYPES (always present, regardless of format):
 - FLASHCARD: concise term/definition or concept/explanation pairs, useful for active recall
 - SOCRATIC: open-ended, prompts critical thinking, no single right answer
 
-Distribute the requested count roughly as: ~40% recall, ~40% flashcard, ~20% socratic. For 5 questions: 2 recall, 2 flashcard, 1 socratic. For 3: 1 recall, 1 flashcard, 1 socratic. For 7: 3 recall, 3 flashcard, 1 socratic.
+Distribute questions based on format:
+- "open" → ~40% recall, ~40% flashcard, ~20% socratic. For 5 questions: 2 recall, 2 flashcard, 1 socratic. For 3: 1 recall, 1 flashcard, 1 socratic. For 7: 3 recall, 3 flashcard, 1 socratic.
+- "mix" → same distribution as "open" (recall and flashcard get a mix of MC and open formats, socratic stays open).
+- "multiple_choice" → 50/50 recall and flashcard, NO socratic. For 5: 3 recall, 2 flashcard (or 2 and 3). For 3: 2 recall, 1 flashcard. For 7: 4 recall, 3 flashcard.
 
 FORMAT rules:
 - "open" → all questions are open-ended (single answer field).

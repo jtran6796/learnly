@@ -7,9 +7,68 @@
   </head>
   <body>
     <header>
-      <h1>Learnly</h1>
-      <p class="tagline">Questions on what you're reading</p>
+      <div class="header-row">
+        <div>
+          <h1>Learnly</h1>
+          <p class="tagline">Questions on what you're reading</p>
+        </div>
+        <button id="settings-toggle" class="icon-btn" aria-label="Settings" aria-expanded="false">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
     </header>
+
+    <section id="settings-panel" class="settings-panel hidden" aria-hidden="true">
+      <h2 class="settings-title">Settings</h2>
+
+      <div class="setting-group">
+        <label class="setting-label">Question format</label>
+        <div class="radio-group" role="radiogroup">
+          <label class="radio-option">
+            <input type="radio" name="format" value="open" />
+            <span>Open-ended</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="format" value="multiple_choice" />
+            <span>Multiple choice</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="format" value="mix" />
+            <span>Mix of both</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <label class="setting-label" for="count-slider">
+          Number of questions: <span id="count-value">5</span>
+        </label>
+        <input
+          type="range"
+          id="count-slider"
+          min="3"
+          max="7"
+          step="2"
+          value="5"
+          list="count-marks"
+        />
+        <datalist id="count-marks">
+          <option value="3" label="3"></option>
+          <option value="5" label="5"></option>
+          <option value="7" label="7"></option>
+        </datalist>
+        <div class="slider-marks">
+          <span>3</span>
+          <span>5</span>
+          <span>7</span>
+        </div>
+      </div>
+
+      <button id="reset-settings" class="text-btn">Reset to defaults</button>
+    </section>
 
     <main>
       <button id="generate-btn" class="primary">Generate questions</button>

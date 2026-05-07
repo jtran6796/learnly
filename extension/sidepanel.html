@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Learnly</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Learnly</h1>
+      <p class="tagline">Questions on what you're reading</p>
+    </header>
+
+    <main>
+      <button id="generate-btn" class="primary">Generate questions</button>
+
+      <div id="status" class="status hidden"></div>
+
+      <div id="meta" class="meta hidden">
+        <span id="meta-mode"></span>
+        <span id="meta-title"></span>
+      </div>
+
+      <div id="questions"></div>
+    </main>
+
+    <footer>
+      <p>Tip: select text on the page to focus questions on a passage.</p>
+    </footer>
+
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>

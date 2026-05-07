@@ -1,0 +1,185 @@
+:root {
+  --bg: #fafaf7;
+  --fg: #1a1a1a;
+  --muted: #6b6b6b;
+  --accent: #5b4fcf;
+  --accent-hover: #4a3fc0;
+  --card: #ffffff;
+  --border: #e5e5e0;
+  --recall: #2563eb;
+  --flashcard: #16a34a;
+  --socratic: #c2410c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 16px;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+header h1 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.tagline {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+button.primary {
+  width: 100%;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+button.primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.status {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #f0f0eb;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.status.error {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.meta {
+  margin: 16px 0 8px;
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#meta-title {
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.hidden {
+  display: none;
+}
+
+.question-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.question-type {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-bottom: 8px;
+  color: white;
+}
+
+.question-type.recall {
+  background: var(--recall);
+}
+.question-type.flashcard {
+  background: var(--flashcard);
+}
+.question-type.socratic {
+  background: var(--socratic);
+}
+
+.question-text {
+  font-weight: 500;
+  margin: 0 0 10px;
+}
+
+.reveal-btn {
+  font-size: 12px;
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.answer {
+  margin-top: 10px;
+  padding: 10px;
+  background: #f7f7f3;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--fg);
+}
+
+.feedback-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.feedback-btn {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.feedback-btn:hover {
+  background: #f7f7f3;
+}
+
+.feedback-btn.selected {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+footer {
+  margin-top: 24px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+footer p {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0;
+}

@@ -1,5 +1,5 @@
 // Learnly backend - Cloudflare Worker
-// Takes scraped page content, returns 5 mixed questions from Claude Haiku 4.5
+// Takes scraped page content + settings, returns N mixed questions from Claude Haiku 4.5
 //
 // Setup:
 //   npm install -g wrangler
@@ -9,33 +9,54 @@
 
 const SYSTEM_PROMPT = `You are Learnly, a study assistant that helps students engage deeply with what they read.
 
-Given an article or passage, generate exactly 5 questions that test understanding:
-- 2 RECALL questions (test memory of key facts/concepts directly from the text)
-- 2 FLASHCARD questions (concise term/definition or concept/explanation pairs, useful for active recall)
-- 1 SOCRATIC question (open-ended, prompts critical thinking, no single right answer)
+Given an article or passage, generate study questions that test understanding. The user will specify:
+- count: total number of questions (3, 5, or 7)
+- format: "open" (open-ended), "multiple_choice", or "mix" (both formats)
 
-Each question must include the answer the student should arrive at.
+Question TYPES (always present, regardless of format):
+- RECALL: tests memory of key facts/concepts directly from the text
+- FLASHCARD: concise term/definition or concept/explanation pairs, useful for active recall
+- SOCRATIC: open-ended, prompts critical thinking, no single right answer
 
-Rules:
+Distribute the requested count roughly as: ~40% recall, ~40% flashcard, ~20% socratic. For 5 questions: 2 recall, 2 flashcard, 1 socratic. For 3: 1 recall, 1 flashcard, 1 socratic. For 7: 3 recall, 3 flashcard, 1 socratic.
+
+FORMAT rules:
+- "open" → all questions are open-ended (single answer field).
+- "multiple_choice" → recall and flashcard questions are MC. Socratic stays open-ended (MC doesn't fit it).
+- "mix" → roughly half MC and half open-ended, distributed across types. Socratic always open-ended.
+
+For MULTIPLE CHOICE questions:
+- Provide exactly 4 options.
+- Always place the correct answer at index 0. The server will shuffle positions.
+- Distractors must be plausible: common misconceptions, related concepts, or near-misses. Avoid joke or obviously-wrong options.
+- The "answer" field should explain why the correct option is right (1-2 sentences).
+
+For OPEN-ENDED questions:
+- "answer" is the answer the student should arrive at.
+
+General rules:
 - Questions must be answerable from the text (except Socratic, which extends from it).
 - Avoid trivia. Focus on important ideas, mechanisms, relationships.
 - Keep questions clear and one sentence where possible.
-- Do not number the questions; the JSON structure handles ordering.
 
 Respond ONLY with a JSON object in this exact shape, no preamble, no markdown fences:
 
 {
   "questions": [
-    { "type": "recall", "question": "...", "answer": "..." },
-    { "type": "recall", "question": "...", "answer": "..." },
-    { "type": "flashcard", "question": "...", "answer": "..." },
-    { "type": "flashcard", "question": "...", "answer": "..." },
-    { "type": "socratic", "question": "...", "answer": "..." }
+    {
+      "type": "recall" | "flashcard" | "socratic",
+      "format": "open" | "multiple_choice",
+      "question": "...",
+      "options": ["correct answer", "distractor", "distractor", "distractor"],  // ONLY for multiple_choice; omit for open
+      "correctIndex": 0,  // ONLY for multiple_choice; omit for open
+      "answer": "..."
+    }
   ]
 }`;
+
 // Simple in-memory rate limit per IP (resets on worker cold start; good enough for MVP)
 const rateLimits = new Map();
-const RATE_LIMIT_MAX = 100; // requests per hour per IP
+const RATE_LIMIT_MAX = 100;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 
 function checkRateLimit(ip) {
@@ -50,9 +71,9 @@ function checkRateLimit(ip) {
   return true;
 }
 
-// FNV-1a hash for content-based caching key
-async function hashContent(text) {
-  const buf = new TextEncoder().encode(text);
+async function hashContent(text, settings) {
+  // Include settings in the cache key so different settings produce different cached results
+  const buf = new TextEncoder().encode(`${settings.format}|${settings.count}|${text}`);
   const digest = await crypto.subtle.digest("SHA-256", buf);
   return [...new Uint8Array(digest)]
     .slice(0, 16)
@@ -61,7 +82,7 @@ async function hashContent(text) {
 }
 
 const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*", // tighten to your extension origin in production
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
@@ -73,9 +94,42 @@ function jsonResponse(body, status = 200) {
   });
 }
 
-async function generateQuestions(content, apiKey) {
-  // Truncate very long content to keep token costs predictable
+// Validate and normalize settings from client. Don't trust the client.
+const ALLOWED_FORMATS = ["open", "multiple_choice", "mix"];
+const ALLOWED_COUNTS = [3, 5, 7];
+const DEFAULT_SETTINGS = { format: "mix", count: 5 };
+
+function normalizeSettings(raw) {
+  const settings = { ...DEFAULT_SETTINGS };
+  if (raw && typeof raw === "object") {
+    if (ALLOWED_FORMATS.includes(raw.format)) settings.format = raw.format;
+    if (ALLOWED_COUNTS.includes(raw.count)) settings.count = raw.count;
+  }
+  return settings;
+}
+
+// Fisher-Yates shuffle for MC options. Updates correctIndex to track the right answer.
+function shuffleMultipleChoice(question) {
+  if (question.format !== "multiple_choice" || !Array.isArray(question.options)) {
+    return question;
+  }
+  const correctText = question.options[question.correctIndex];
+  const shuffled = [...question.options];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return {
+    ...question,
+    options: shuffled,
+    correctIndex: shuffled.indexOf(correctText),
+  };
+}
+
+async function generateQuestions(content, settings, apiKey) {
   const trimmed = content.length > 12000 ? content.slice(0, 12000) : content;
+
+  const userMessage = `Generate ${settings.count} study questions in "${settings.format}" format for the following content:\n\n${trimmed}`;
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -86,14 +140,9 @@ async function generateQuestions(content, apiKey) {
     },
     body: JSON.stringify({
       model: "claude-haiku-4-5",
-      max_tokens: 1500,
+      max_tokens: 2000,
       system: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: "user",
-          content: `Generate 5 study questions for this content:\n\n${trimmed}`,
-        },
-      ],
+      messages: [{ role: "user", content: userMessage }],
     }),
   });
 
@@ -104,15 +153,15 @@ async function generateQuestions(content, apiKey) {
 
   const data = await res.json();
   const text = data.content?.[0]?.text ?? "";
-
-  // Strip any accidental code fences just in case
   const cleaned = text.replace(/```json\s*|```\s*/g, "").trim();
   const parsed = JSON.parse(cleaned);
 
   if (!Array.isArray(parsed.questions) || parsed.questions.length === 0) {
     throw new Error("Model returned no questions");
   }
-  return parsed.questions;
+
+  // Shuffle MC options server-side so correct answers are uniformly distributed
+  return parsed.questions.map(shuffleMultipleChoice);
 }
 
 export default {
@@ -144,9 +193,10 @@ export default {
       );
     }
 
+    const settings = normalizeSettings(payload.settings);
+
     try {
-      // Cache lookup (KV optional - works without if KV not bound)
-      const cacheKey = `q:${await hashContent(content)}`;
+      const cacheKey = `q:${await hashContent(content, settings)}`;
       if (env.LEARNLY_CACHE) {
         const cached = await env.LEARNLY_CACHE.get(cacheKey);
         if (cached) {
@@ -154,10 +204,9 @@ export default {
         }
       }
 
-      const questions = await generateQuestions(content, env.ANTHROPIC_API_KEY);
+      const questions = await generateQuestions(content, settings, env.ANTHROPIC_API_KEY);
 
       if (env.LEARNLY_CACHE) {
-        // Cache for 7 days
         await env.LEARNLY_CACHE.put(cacheKey, JSON.stringify(questions), {
           expirationTtl: 60 * 60 * 24 * 7,
         });

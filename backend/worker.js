@@ -50,6 +50,16 @@ function checkRateLimit(ip) {
   return true;
 }
 
+// FNV-1a hash for content-based caching key
+async function hashContent(text) {
+  const buf = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest("SHA-256", buf);
+  return [...new Uint8Array(digest)]
+    .slice(0, 16)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*", // tighten to your extension origin in production
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -135,7 +145,24 @@ export default {
     }
 
     try {
+      // Cache lookup (KV optional - works without if KV not bound)
+      const cacheKey = `q:${await hashContent(content)}`;
+      if (env.LEARNLY_CACHE) {
+        const cached = await env.LEARNLY_CACHE.get(cacheKey);
+        if (cached) {
+          return jsonResponse({ questions: JSON.parse(cached), cached: true });
+        }
+      }
+
       const questions = await generateQuestions(content, env.ANTHROPIC_API_KEY);
+
+      if (env.LEARNLY_CACHE) {
+        // Cache for 7 days
+        await env.LEARNLY_CACHE.put(cacheKey, JSON.stringify(questions), {
+          expirationTtl: 60 * 60 * 24 * 7,
+        });
+      }
+
       return jsonResponse({ questions, cached: false });
     } catch (err) {
       console.error("generateQuestions failed:", err);

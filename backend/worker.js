@@ -33,6 +33,22 @@ Respond ONLY with a JSON object in this exact shape, no preamble, no markdown fe
     { "type": "socratic", "question": "...", "answer": "..." }
   ]
 }`;
+// Simple in-memory rate limit per IP (resets on worker cold start; good enough for MVP)
+const rateLimits = new Map();
+const RATE_LIMIT_MAX = 100; // requests per hour per IP
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const entry = rateLimits.get(ip);
+  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+    rateLimits.set(ip, { count: 1, windowStart: now });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT_MAX) return false;
+  entry.count += 1;
+  return true;
+}
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*", // tighten to your extension origin in production

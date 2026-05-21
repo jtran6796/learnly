@@ -311,11 +311,23 @@ generateBtn.addEventListener("click", async () => {
   }
 });
 
-// Refresh button label when side panel opens / tab changes
-updateGenerateButton();
-chrome.tabs.onActivated.addListener(updateGenerateButton);
+// Sync the panel to the active tab. Clears stale questions when the URL changes.
+let currentUrl = null;
+
+async function syncToActiveTab() {
+  const tab = await getActiveTab();
+  const newUrl = tab?.url || null;
+  if (newUrl !== currentUrl) {
+    currentUrl = newUrl;
+    clearOutput();
+  }
+  updateGenerateButton();
+}
+
+syncToActiveTab();
+chrome.tabs.onActivated.addListener(syncToActiveTab);
 chrome.tabs.onUpdated.addListener((_, changeInfo) => {
-  if (changeInfo.url) updateGenerateButton();
+  if (changeInfo.url) syncToActiveTab();
 });
 
 // ---------- Init ----------

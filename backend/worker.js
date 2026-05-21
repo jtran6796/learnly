@@ -152,7 +152,10 @@ function normalizeSettings(raw) {
 }
 
 function shuffleMultipleChoice(question) {
-  if (question.format !== "multiple_choice" || !Array.isArray(question.options)) {
+  if (
+    question.format !== "multiple_choice" ||
+    !Array.isArray(question.options)
+  ) {
     return question;
   }
   const correctText = question.options[question.correctIndex];
@@ -168,7 +171,14 @@ function shuffleMultipleChoice(question) {
   };
 }
 
-async function generateQuestions({ mode, content, topic, context, settings, apiKey }) {
+async function generateQuestions({
+  mode,
+  content,
+  topic,
+  context,
+  settings,
+  apiKey,
+}) {
   let systemPrompt;
   let userMessage;
 
@@ -224,7 +234,10 @@ export default {
 
     const ip = request.headers.get("CF-Connecting-IP") || "unknown";
     if (!checkRateLimit(ip)) {
-      return jsonResponse({ error: "Rate limit exceeded. Try again later." }, 429);
+      return jsonResponse(
+        { error: "Rate limit exceeded. Try again later." },
+        429,
+      );
     }
 
     let payload;
@@ -234,7 +247,9 @@ export default {
       return jsonResponse({ error: "Invalid JSON body" }, 400);
     }
 
-    const mode = ALLOWED_MODES.includes(payload.mode) ? payload.mode : "article";
+    const mode = ALLOWED_MODES.includes(payload.mode)
+      ? payload.mode
+      : "article";
     const settings = normalizeSettings(payload.settings);
 
     let cacheKey;
@@ -242,20 +257,25 @@ export default {
       const topic = (payload.topic || "").trim();
       const context = (payload.context || "").trim();
       if (topic.length < 3) {
-        return jsonResponse(
-          { error: "Topic is too short or missing." },
-          400,
-        );
+        return jsonResponse({ error: "Topic is too short or missing." }, 400);
       }
       cacheKey = `q:topic:${await hashKey(`${topic}|${context}|${settings.format}|${settings.count}`)}`;
 
       try {
         if (env.LEARNLY_CACHE) {
           const cached = await env.LEARNLY_CACHE.get(cacheKey);
-          if (cached) return jsonResponse({ questions: JSON.parse(cached), cached: true });
+          if (cached)
+            return jsonResponse({
+              questions: JSON.parse(cached),
+              cached: true,
+            });
         }
         const questions = await generateQuestions({
-          mode, topic, context, settings, apiKey: env.ANTHROPIC_API_KEY,
+          mode,
+          topic,
+          context,
+          settings,
+          apiKey: env.ANTHROPIC_API_KEY,
         });
         if (env.LEARNLY_CACHE) {
           await env.LEARNLY_CACHE.put(cacheKey, JSON.stringify(questions), {
@@ -271,7 +291,10 @@ export default {
       const content = (payload.content || "").trim();
       if (content.length < 100) {
         return jsonResponse(
-          { error: "Content too short. Select more text or try a different page." },
+          {
+            error:
+              "Content too short. Select more text or try a different page.",
+          },
           400,
         );
       }
@@ -280,10 +303,17 @@ export default {
       try {
         if (env.LEARNLY_CACHE) {
           const cached = await env.LEARNLY_CACHE.get(cacheKey);
-          if (cached) return jsonResponse({ questions: JSON.parse(cached), cached: true });
+          if (cached)
+            return jsonResponse({
+              questions: JSON.parse(cached),
+              cached: true,
+            });
         }
         const questions = await generateQuestions({
-          mode, content, settings, apiKey: env.ANTHROPIC_API_KEY,
+          mode,
+          content,
+          settings,
+          apiKey: env.ANTHROPIC_API_KEY,
         });
         if (env.LEARNLY_CACHE) {
           await env.LEARNLY_CACHE.put(cacheKey, JSON.stringify(questions), {
@@ -298,3 +328,11 @@ export default {
     }
   },
 };
+
+// Exports for testing
+export { normalizeSettings, shuffleMultipleChoice, checkRateLimit, hashKey };
+
+// Test helper: clear in-memory rate limit state between tests.
+export function _resetRateLimits() {
+  rateLimits.clear();
+}

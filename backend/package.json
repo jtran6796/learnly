@@ -1,0 +1,19 @@
+{
+  "name": "learnly-backend",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker that takes scraped page content and returns 5 mixed study questions from Claude Haiku 4.5.",
+  "main": "worker.js",
+  "scripts": {
+  "test": "vitest run",
+  "test:watch": "vitest",
+  "deploy": "wrangler deploy",
+  "dev": "wrangler dev"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "vitest": "^4.1.7"
+  }
+}

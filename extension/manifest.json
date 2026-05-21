@@ -3,7 +3,7 @@
   "name": "Learnly",
   "version": "0.1.0",
   "description": "AI study buddy that turns whatever you're reading into questions.",
-  "permissions": ["activeTab", "scripting", "sidePanel", "storage"],
+  "permissions": ["activeTab", "scripting", "sidePanel", "storage", "webNavigation"],
   "host_permissions": ["<all_urls>"],
   "action": {
     "default_title": "Learnly — generate study questions"

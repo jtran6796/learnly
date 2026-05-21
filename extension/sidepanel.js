@@ -270,6 +270,7 @@ generateBtn.addEventListener("click", async () => {
 
     const mode = detectMode(tab.url);
     const extracted = await extractFromTab(tab.id, mode);
+    console.log("[generate] extracted URL:", extracted._url, "actual tab URL:", tab.url);
     console.log("extracted:", extracted, "mode:", mode);
     if (!extracted || extracted.mode === "error") {
       throw new Error(extracted?.error || `Extraction failed. Mode: ${mode}. Got: ${JSON.stringify(extracted)}`);
@@ -329,6 +330,17 @@ chrome.tabs.onActivated.addListener(syncToActiveTab);
 chrome.tabs.onUpdated.addListener((_, changeInfo) => {
   if (changeInfo.url) syncToActiveTab();
 });
+
+// SPA navigations (YouTube autoplay, Notion, etc.) don't fire tabs.onUpdated reliably.
+if (chrome.webNavigation?.onHistoryStateUpdated) {
+  chrome.webNavigation.onHistoryStateUpdated.addListener(() => {
+    syncToActiveTab();
+  });
+}
+
+// Belt-and-suspenders: poll the active tab's URL every 2 seconds.
+// Catches YouTube autoplay and other SPA transitions that bypass both events above.
+setInterval(syncToActiveTab, 2000);
 
 // ---------- Init ----------
 

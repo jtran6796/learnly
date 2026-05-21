@@ -1,37 +1,30 @@
 // Learnly backend - Cloudflare Worker
-// Takes scraped page content + settings, returns N mixed questions from Claude Haiku 4.5
-//
-// Setup:
-//   npm install -g wrangler
-//   wrangler login
-//   wrangler secret put ANTHROPIC_API_KEY
-//   wrangler deploy
 
-const SYSTEM_PROMPT = `You are Learnly, a study assistant that helps students engage deeply with what they read.
+const ARTICLE_SYSTEM_PROMPT = `You are Learnly, a study assistant that helps students engage deeply with what they read.
 
 Given an article or passage, generate study questions that test understanding. The user will specify:
 - count: total number of questions (3, 5, or 7)
 - format: "open" (open-ended), "multiple_choice", or "mix" (both formats)
 
-Question TYPES (always present, regardless of format):
+Question TYPES:
 - RECALL: tests memory of key facts/concepts directly from the text
 - FLASHCARD: concise term/definition or concept/explanation pairs, useful for active recall
 - SOCRATIC: open-ended, prompts critical thinking, no single right answer
 
 Distribute questions based on format:
-- "open" → ~40% recall, ~40% flashcard, ~20% socratic. For 5 questions: 2 recall, 2 flashcard, 1 socratic. For 3: 1 recall, 1 flashcard, 1 socratic. For 7: 3 recall, 3 flashcard, 1 socratic.
+- "open" → ~40% recall, ~40% flashcard, ~20% socratic. For 5: 2 recall, 2 flashcard, 1 socratic. For 3: 1/1/1. For 7: 3/3/1.
 - "mix" → same distribution as "open" (recall and flashcard get a mix of MC and open formats, socratic stays open).
-- "multiple_choice" → 50/50 recall and flashcard, NO socratic. For 5: 3 recall, 2 flashcard (or 2 and 3). For 3: 2 recall, 1 flashcard. For 7: 4 recall, 3 flashcard.
+- "multiple_choice" → 50/50 recall and flashcard, NO socratic. For 5: 3/2 or 2/3. For 3: 2/1. For 7: 4/3.
 
 FORMAT rules:
 - "open" → all questions are open-ended (single answer field).
-- "multiple_choice" → recall and flashcard questions are MC. Socratic stays open-ended (MC doesn't fit it).
-- "mix" → roughly half MC and half open-ended, distributed across types. Socratic always open-ended.
+- "multiple_choice" → recall and flashcard questions are MC. Socratic stays open-ended.
+- "mix" → roughly half MC and half open, distributed across types. Socratic always open-ended.
 
 For MULTIPLE CHOICE questions:
 - Provide exactly 4 options.
 - Always place the correct answer at index 0. The server will shuffle positions.
-- Distractors must be plausible: common misconceptions, related concepts, or near-misses. Avoid joke or obviously-wrong options.
+- Distractors must be plausible: common misconceptions, related concepts, or near-misses.
 - The "answer" field should explain why the correct option is right (1-2 sentences).
 
 For OPEN-ENDED questions:
@@ -42,7 +35,7 @@ General rules:
 - Avoid trivia. Focus on important ideas, mechanisms, relationships.
 - Keep questions clear and one sentence where possible.
 
-Respond ONLY with a JSON object in this exact shape, no preamble, no markdown fences:
+Respond ONLY with a JSON object, no preamble, no markdown fences:
 
 {
   "questions": [
@@ -50,14 +43,62 @@ Respond ONLY with a JSON object in this exact shape, no preamble, no markdown fe
       "type": "recall" | "flashcard" | "socratic",
       "format": "open" | "multiple_choice",
       "question": "...",
-      "options": ["correct answer", "distractor", "distractor", "distractor"],  // ONLY for multiple_choice; omit for open
-      "correctIndex": 0,  // ONLY for multiple_choice; omit for open
+      "options": ["correct", "distractor", "distractor", "distractor"],
+      "correctIndex": 0,
       "answer": "..."
     }
   ]
 }`;
 
-// Simple in-memory rate limit per IP (resets on worker cold start; good enough for MVP)
+const TOPIC_SYSTEM_PROMPT = `You are Learnly, a study assistant. The user is studying a topic, typically from an educational video or course. Generate study questions covering the standard body of knowledge for this topic, drawing from your own knowledge of the subject.
+
+When context is provided (course name, instructor, certification), calibrate the difficulty and style accordingly. CompTIA Security+ gets exam-level questions. An intro biology video gets undergrad-level questions. A popular-educator overview gets accessible questions.
+
+For each topic, cover:
+- Core definitions and key terminology
+- Important concepts students commonly misunderstand
+- Relationships to closely related ideas
+- Practical applications where relevant
+
+The user will specify:
+- count: total number of questions (3, 5, or 7)
+- format: "open" (open-ended), "multiple_choice", or "mix"
+
+Question TYPES:
+- RECALL: tests memory of key facts/definitions
+- FLASHCARD: concise term/definition pairs for active recall
+- SOCRATIC: open-ended, prompts critical thinking
+
+Distribution and format rules are identical to article mode:
+- "open" → 40% recall, 40% flashcard, 20% socratic
+- "mix" → same distribution, mixed formats. Socratic stays open.
+- "multiple_choice" → 50/50 recall/flashcard, NO socratic.
+
+For MULTIPLE CHOICE:
+- Exactly 4 options.
+- Correct answer at index 0 (server shuffles).
+- Plausible distractors: common misconceptions, related concepts.
+- "answer" field explains why the correct option is right.
+
+For OPEN-ENDED:
+- "answer" is the answer the student should arrive at.
+
+Respond ONLY with JSON, no preamble or markdown fences:
+
+{
+  "questions": [
+    {
+      "type": "recall" | "flashcard" | "socratic",
+      "format": "open" | "multiple_choice",
+      "question": "...",
+      "options": ["correct", "distractor", "distractor", "distractor"],
+      "correctIndex": 0,
+      "answer": "..."
+    }
+  ]
+}`;
+
+// Rate limiting
 const rateLimits = new Map();
 const RATE_LIMIT_MAX = 100;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
@@ -74,9 +115,8 @@ function checkRateLimit(ip) {
   return true;
 }
 
-async function hashContent(text, settings) {
-  // Include settings in the cache key so different settings produce different cached results
-  const buf = new TextEncoder().encode(`${settings.format}|${settings.count}|${text}`);
+async function hashKey(input) {
+  const buf = new TextEncoder().encode(input);
   const digest = await crypto.subtle.digest("SHA-256", buf);
   return [...new Uint8Array(digest)]
     .slice(0, 16)
@@ -97,9 +137,9 @@ function jsonResponse(body, status = 200) {
   });
 }
 
-// Validate and normalize settings from client. Don't trust the client.
 const ALLOWED_FORMATS = ["open", "multiple_choice", "mix"];
 const ALLOWED_COUNTS = [3, 5, 7];
+const ALLOWED_MODES = ["article", "topic"];
 const DEFAULT_SETTINGS = { format: "mix", count: 5 };
 
 function normalizeSettings(raw) {
@@ -111,7 +151,6 @@ function normalizeSettings(raw) {
   return settings;
 }
 
-// Fisher-Yates shuffle for MC options. Updates correctIndex to track the right answer.
 function shuffleMultipleChoice(question) {
   if (question.format !== "multiple_choice" || !Array.isArray(question.options)) {
     return question;
@@ -129,10 +168,19 @@ function shuffleMultipleChoice(question) {
   };
 }
 
-async function generateQuestions(content, settings, apiKey) {
-  const trimmed = content.length > 12000 ? content.slice(0, 12000) : content;
+async function generateQuestions({ mode, content, topic, context, settings, apiKey }) {
+  let systemPrompt;
+  let userMessage;
 
-  const userMessage = `Generate ${settings.count} study questions in "${settings.format}" format for the following content:\n\n${trimmed}`;
+  if (mode === "topic") {
+    systemPrompt = TOPIC_SYSTEM_PROMPT;
+    const contextLine = context ? `\nContext: ${context}` : "";
+    userMessage = `Generate ${settings.count} study questions in "${settings.format}" format on this topic:\n\nTopic: ${topic}${contextLine}`;
+  } else {
+    systemPrompt = ARTICLE_SYSTEM_PROMPT;
+    const trimmed = content.length > 12000 ? content.slice(0, 12000) : content;
+    userMessage = `Generate ${settings.count} study questions in "${settings.format}" format for the following content:\n\n${trimmed}`;
+  }
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -144,7 +192,7 @@ async function generateQuestions(content, settings, apiKey) {
     body: JSON.stringify({
       model: "claude-haiku-4-5",
       max_tokens: 2000,
-      system: SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: [{ role: "user", content: userMessage }],
     }),
   });
@@ -162,8 +210,6 @@ async function generateQuestions(content, settings, apiKey) {
   if (!Array.isArray(parsed.questions) || parsed.questions.length === 0) {
     throw new Error("Model returned no questions");
   }
-
-  // Shuffle MC options server-side so correct answers are uniformly distributed
   return parsed.questions.map(shuffleMultipleChoice);
 }
 
@@ -188,37 +234,67 @@ export default {
       return jsonResponse({ error: "Invalid JSON body" }, 400);
     }
 
-    const content = (payload.content || "").trim();
-    if (content.length < 100) {
-      return jsonResponse(
-        { error: "Content too short. Select more text or try a different page." },
-        400,
-      );
-    }
-
+    const mode = ALLOWED_MODES.includes(payload.mode) ? payload.mode : "article";
     const settings = normalizeSettings(payload.settings);
 
-    try {
-      const cacheKey = `q:${await hashContent(content, settings)}`;
-      if (env.LEARNLY_CACHE) {
-        const cached = await env.LEARNLY_CACHE.get(cacheKey);
-        if (cached) {
-          return jsonResponse({ questions: JSON.parse(cached), cached: true });
+    let cacheKey;
+    if (mode === "topic") {
+      const topic = (payload.topic || "").trim();
+      const context = (payload.context || "").trim();
+      if (topic.length < 3) {
+        return jsonResponse(
+          { error: "Topic is too short or missing." },
+          400,
+        );
+      }
+      cacheKey = `q:topic:${await hashKey(`${topic}|${context}|${settings.format}|${settings.count}`)}`;
+
+      try {
+        if (env.LEARNLY_CACHE) {
+          const cached = await env.LEARNLY_CACHE.get(cacheKey);
+          if (cached) return jsonResponse({ questions: JSON.parse(cached), cached: true });
         }
-      }
-
-      const questions = await generateQuestions(content, settings, env.ANTHROPIC_API_KEY);
-
-      if (env.LEARNLY_CACHE) {
-        await env.LEARNLY_CACHE.put(cacheKey, JSON.stringify(questions), {
-          expirationTtl: 60 * 60 * 24 * 7,
+        const questions = await generateQuestions({
+          mode, topic, context, settings, apiKey: env.ANTHROPIC_API_KEY,
         });
+        if (env.LEARNLY_CACHE) {
+          await env.LEARNLY_CACHE.put(cacheKey, JSON.stringify(questions), {
+            expirationTtl: 60 * 60 * 24 * 7,
+          });
+        }
+        return jsonResponse({ questions, cached: false });
+      } catch (err) {
+        console.error("topic generation failed:", err);
+        return jsonResponse({ error: "Failed to generate questions" }, 500);
       }
+    } else {
+      const content = (payload.content || "").trim();
+      if (content.length < 100) {
+        return jsonResponse(
+          { error: "Content too short. Select more text or try a different page." },
+          400,
+        );
+      }
+      cacheKey = `q:article:${await hashKey(`${settings.format}|${settings.count}|${content}`)}`;
 
-      return jsonResponse({ questions, cached: false });
-    } catch (err) {
-      console.error("generateQuestions failed:", err);
-      return jsonResponse({ error: "Failed to generate questions" }, 500);
+      try {
+        if (env.LEARNLY_CACHE) {
+          const cached = await env.LEARNLY_CACHE.get(cacheKey);
+          if (cached) return jsonResponse({ questions: JSON.parse(cached), cached: true });
+        }
+        const questions = await generateQuestions({
+          mode, content, settings, apiKey: env.ANTHROPIC_API_KEY,
+        });
+        if (env.LEARNLY_CACHE) {
+          await env.LEARNLY_CACHE.put(cacheKey, JSON.stringify(questions), {
+            expirationTtl: 60 * 60 * 24 * 7,
+          });
+        }
+        return jsonResponse({ questions, cached: false });
+      } catch (err) {
+        console.error("article generation failed:", err);
+        return jsonResponse({ error: "Failed to generate questions" }, 500);
+      }
     }
   },
 };

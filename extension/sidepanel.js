@@ -28,13 +28,6 @@ function setStatus(text, isError = false) {
   statusEl.classList.toggle("error", isError);
 }
 
-function setMeta(mode, title) {
-  metaMode.textContent =
-    mode === "selection" ? "From your selection" : "From the article";
-  metaTitle.textContent = title;
-  metaEl.classList.remove("hidden");
-}
-
 function clearOutput() {
   questionsEl.innerHTML = "";
   metaEl.classList.add("hidden");
@@ -44,11 +37,9 @@ function clearOutput() {
 // ---------- Settings panel ----------
 
 function applySettingsToUI(settings) {
-  // Radio: format
   document.querySelectorAll('input[name="format"]').forEach((el) => {
     el.checked = el.value === settings.format;
   });
-  // Slider: count
   countSlider.value = String(settings.count);
   countValue.textContent = String(settings.count);
 }
@@ -68,14 +59,12 @@ function toggleSettingsPanel() {
 
 settingsToggle.addEventListener("click", toggleSettingsPanel);
 
-// Format radios — auto-save on change
 document.querySelectorAll('input[name="format"]').forEach((radio) => {
   radio.addEventListener("change", (e) => {
     if (e.target.checked) setSetting("format", e.target.value);
   });
 });
 
-// Count slider — update label live, save on change
 countSlider.addEventListener("input", (e) => {
   countValue.textContent = e.target.value;
 });
@@ -83,7 +72,6 @@ countSlider.addEventListener("change", (e) => {
   setSetting("count", Number(e.target.value));
 });
 
-// Reset
 resetBtn.addEventListener("click", async () => {
   const fresh = await resetSettings();
   applySettingsToUI(fresh);
@@ -91,30 +79,62 @@ resetBtn.addEventListener("click", async () => {
 
 // ---------- Generate flow ----------
 
+function detectMode(url) {
+  if (!url) return "article";
+  if (/^https?:\/\/(www\.)?youtube\.com\/watch/.test(url)) return "topic_youtube";
+  return "article";
+}
+
 async function getActiveTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   return tab;
 }
 
-async function extractFromTab(tabId) {
+async function extractFromTab(tabId, mode) {
+  const files =
+    mode === "topic_youtube"
+      ? ["lib/extract-youtube.js"]
+      : ["lib/readability.js", "lib/extract.js"];
+
   const results = await chrome.scripting.executeScript({
     target: { tabId },
-    files: ["lib/readability.js", "lib/extract.js"],
+    files,
   });
   return results?.[0]?.result;
 }
 
-async function generateQuestions(content, settings) {
+async function generateQuestions(payload) {
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content, settings }),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Backend returned ${res.status}`);
   }
   return res.json();
+}
+
+function setMetaForMode(extracted, mode) {
+  if (mode === "topic_youtube") {
+    metaMode.textContent = "From the video topic";
+    metaTitle.textContent = extracted.channel
+      ? `${extracted.topic} · ${extracted.channel}`
+      : extracted.topic;
+  } else {
+    metaMode.textContent =
+      extracted.mode === "selection" ? "From your selection" : "From the article";
+    metaTitle.textContent = extracted.title;
+  }
+  metaEl.classList.remove("hidden");
+}
+
+async function updateGenerateButton() {
+  const tab = await getActiveTab();
+  const mode = detectMode(tab?.url);
+  generateBtn.textContent =
+    mode === "topic_youtube" ? "Quiz me on this topic" : "Generate questions";
 }
 
 function renderQuestions(questions) {
@@ -139,7 +159,6 @@ function renderQuestions(questions) {
       renderOpenEnded(card, q);
     }
 
-    // Feedback row (visual only for MVP)
     const feedback = document.createElement("div");
     feedback.className = "feedback-row";
     ["Got it", "Review again"].forEach((label) => {
@@ -178,7 +197,6 @@ function renderOpenEnded(card, q) {
 }
 
 function renderMultipleChoice(card, q) {
-  // q.options: string[], q.correctIndex: number, q.answer: string (explanation)
   const optionsList = document.createElement("div");
   optionsList.className = "mc-options";
 
@@ -223,7 +241,6 @@ function renderMultipleChoice(card, q) {
     checked = true;
     const correct = selectedIndex === q.correctIndex;
 
-    // Mark options
     optionsList.querySelectorAll(".mc-option").forEach((el, i) => {
       if (i === q.correctIndex) el.classList.add("mc-correct");
       else if (i === selectedIndex) el.classList.add("mc-incorrect");
@@ -251,16 +268,38 @@ generateBtn.addEventListener("click", async () => {
       throw new Error("Can't run on this page. Try a regular website.");
     }
 
-    const extracted = await extractFromTab(tab.id);
+    const mode = detectMode(tab.url);
+    const extracted = await extractFromTab(tab.id, mode);
+    console.log("extracted:", extracted, "mode:", mode);
     if (!extracted || extracted.mode === "error") {
-      throw new Error(extracted?.error || "Extraction failed.");
+      throw new Error(extracted?.error || `Extraction failed. Mode: ${mode}. Got: ${JSON.stringify(extracted)}`);
     }
 
-    setMeta(extracted.mode, extracted.title);
+    setMetaForMode(extracted, mode);
     setStatus("Generating questions…");
 
     const settings = await getSettings();
-    const { questions, cached } = await generateQuestions(extracted.content, settings);
+
+    let payload;
+    if (mode === "topic_youtube") {
+      const contextParts = [];
+      if (extracted.channel) contextParts.push(`Channel: ${extracted.channel}`);
+      if (extracted.description) contextParts.push(`Description excerpt: ${extracted.description}`);
+      payload = {
+        mode: "topic",
+        topic: extracted.topic,
+        context: contextParts.join(" | "),
+        settings,
+      };
+    } else {
+      payload = {
+        mode: "article",
+        content: extracted.content,
+        settings,
+      };
+    }
+
+    const { questions, cached } = await generateQuestions(payload);
     renderQuestions(questions);
     setStatus(cached ? "Loaded from cache." : "");
     setTimeout(() => setStatus(""), 2000);
@@ -270,6 +309,13 @@ generateBtn.addEventListener("click", async () => {
   } finally {
     generateBtn.disabled = false;
   }
+});
+
+// Refresh button label when side panel opens / tab changes
+updateGenerateButton();
+chrome.tabs.onActivated.addListener(updateGenerateButton);
+chrome.tabs.onUpdated.addListener((_, changeInfo) => {
+  if (changeInfo.url) updateGenerateButton();
 });
 
 // ---------- Init ----------

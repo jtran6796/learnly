@@ -35,6 +35,16 @@ General rules:
 - Avoid trivia. Focus on important ideas, mechanisms, relationships.
 - Keep questions clear and one sentence where possible.
 
+SCENARIO MODE:
+The user may request "scenario-based" questions. When scenario mode is enabled:
+- Frame recall and flashcard questions as realistic situations a student would encounter in the field, not direct definitions.
+- Example direct: "What is the principle of least privilege?"
+  Example scenario: "Maya is setting up access for a new contractor who needs read access to one specific database. Which security principle should guide her permission decisions?"
+- Scenarios should be plausible, professional, and avoid silly or contrived setups.
+- Use varied, generic names (Alex, Priya, Marcus, Yuki, Sam, Maria, etc.) — don't reuse the same names across questions.
+- DO NOT force scenarios where they don't fit naturally. For purely definitional topics (biology terms, math concepts, historical dates), it's fine to keep questions direct even in scenario mode — but try to add real-world framing where you can.
+- Socratic questions (when present) are unaffected by scenario mode.
+
 Respond ONLY with a JSON object, no preamble, no markdown fences:
 
 {
@@ -82,6 +92,16 @@ For MULTIPLE CHOICE:
 
 For OPEN-ENDED:
 - "answer" is the answer the student should arrive at.
+
+SCENARIO MODE:
+The user may request "scenario-based" questions. When scenario mode is enabled:
+- Frame recall and flashcard questions as realistic situations a student would encounter in the field, not direct definitions.
+- Example direct: "What is the principle of least privilege?"
+  Example scenario: "Maya is setting up access for a new contractor who needs read access to one specific database. Which security principle should guide her permission decisions?"
+- Scenarios should be plausible, professional, and avoid silly or contrived setups.
+- Use varied, generic names (Alex, Priya, Marcus, Yuki, Sam, Maria, etc.) — don't reuse the same names across questions.
+- DO NOT force scenarios where they don't fit naturally. For purely definitional topics (biology terms, math concepts, historical dates), it's fine to keep questions direct even in scenario mode — but try to add real-world framing where you can.
+- Socratic questions (when present) are unaffected by scenario mode.
 
 Respond ONLY with JSON, no preamble or markdown fences:
 
@@ -140,13 +160,14 @@ function jsonResponse(body, status = 200) {
 const ALLOWED_FORMATS = ["open", "multiple_choice", "mix"];
 const ALLOWED_COUNTS = [3, 5, 7];
 const ALLOWED_MODES = ["article", "topic"];
-const DEFAULT_SETTINGS = { format: "mix", count: 5 };
+const DEFAULT_SETTINGS = { format: "mix", count: 5, scenarioMode: false };
 
 function normalizeSettings(raw) {
   const settings = { ...DEFAULT_SETTINGS };
   if (raw && typeof raw === "object") {
     if (ALLOWED_FORMATS.includes(raw.format)) settings.format = raw.format;
     if (ALLOWED_COUNTS.includes(raw.count)) settings.count = raw.count;
+    if (typeof raw.scenarioMode === "boolean") settings.scenarioMode = raw.scenarioMode;
   }
   return settings;
 }
@@ -181,15 +202,16 @@ async function generateQuestions({
 }) {
   let systemPrompt;
   let userMessage;
+  const scenarioLine = settings.scenarioMode ? "\nUse scenario-based questions (realistic situations) where appropriate." : "";
 
   if (mode === "topic") {
     systemPrompt = TOPIC_SYSTEM_PROMPT;
     const contextLine = context ? `\nContext: ${context}` : "";
-    userMessage = `Generate ${settings.count} study questions in "${settings.format}" format on this topic:\n\nTopic: ${topic}${contextLine}`;
+    userMessage = `Generate ${settings.count} study questions in "${settings.format}" format on this topic:${scenarioLine}\n\nTopic: ${topic}${contextLine}`;
   } else {
     systemPrompt = ARTICLE_SYSTEM_PROMPT;
     const trimmed = content.length > 12000 ? content.slice(0, 12000) : content;
-    userMessage = `Generate ${settings.count} study questions in "${settings.format}" format for the following content:\n\n${trimmed}`;
+    userMessage = `Generate ${settings.count} study questions in "${settings.format}" format for the following content:${scenarioLine}\n\n${trimmed}`;
   }
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -259,7 +281,7 @@ export default {
       if (topic.length < 3) {
         return jsonResponse({ error: "Topic is too short or missing." }, 400);
       }
-      cacheKey = `q:topic:${await hashKey(`${topic}|${context}|${settings.format}|${settings.count}`)}`;
+      cacheKey = `q:topic:${await hashKey(`${topic}|${context}|${settings.format}|${settings.count}|${settings.scenarioMode}`)}`;
 
       try {
         if (env.LEARNLY_CACHE) {
@@ -298,7 +320,7 @@ export default {
           400,
         );
       }
-      cacheKey = `q:article:${await hashKey(`${settings.format}|${settings.count}|${content}`)}`;
+      cacheKey = `q:article:${await hashKey(`${settings.format}|${settings.count}|${settings.scenarioMode}|${content}`)}`;
 
       try {
         if (env.LEARNLY_CACHE) {

@@ -9,7 +9,7 @@ import {
 
 describe("normalizeSettings", () => {
   it("returns defaults when input is missing or invalid", () => {
-    const defaults = { format: "mix", count: 5 };
+    const defaults = { format: "mix", count: 5, scenarioMode: false };
     expect(normalizeSettings(undefined)).toEqual(defaults);
     expect(normalizeSettings(null)).toEqual(defaults);
     expect(normalizeSettings({})).toEqual(defaults);
@@ -17,35 +17,36 @@ describe("normalizeSettings", () => {
   });
 
   it("accepts all valid formats", () => {
-    expect(normalizeSettings({ format: "open", count: 5 }).format).toBe("open");
+    expect(normalizeSettings({ format: "open", count: 5, scenarioMode: false }).format).toBe("open");
     expect(
-      normalizeSettings({ format: "multiple_choice", count: 5 }).format,
+      normalizeSettings({ format: "multiple_choice", count: 5, scenarioMode: false }).format,
     ).toBe("multiple_choice");
-    expect(normalizeSettings({ format: "mix", count: 5 }).format).toBe("mix");
+    expect(normalizeSettings({ format: "mix", count: 5, scenarioMode: false }).format).toBe("mix");
   });
 
   it("accepts all valid counts", () => {
-    expect(normalizeSettings({ format: "open", count: 3 }).count).toBe(3);
-    expect(normalizeSettings({ format: "open", count: 5 }).count).toBe(5);
-    expect(normalizeSettings({ format: "open", count: 7 }).count).toBe(7);
+    expect(normalizeSettings({ format: "open", count: 3, scenarioMode: false }).count).toBe(3);
+    expect(normalizeSettings({ format: "open", count: 5, scenarioMode: false }).count).toBe(5);
+    expect(normalizeSettings({ format: "open", count: 7, scenarioMode: false }).count).toBe(7);
   });
 
   it("rejects invalid format and falls back to default", () => {
-    expect(normalizeSettings({ format: "banana", count: 5 }).format).toBe(
+    expect(normalizeSettings({ format: "banana", count: 5, scenarioMode: false }).format).toBe(
       "mix",
     );
   });
 
   it("rejects invalid count and falls back to default", () => {
-    expect(normalizeSettings({ format: "open", count: 999 }).count).toBe(5);
-    expect(normalizeSettings({ format: "open", count: -1 }).count).toBe(5);
-    expect(normalizeSettings({ format: "open", count: "5" }).count).toBe(5); // string, not number
+    expect(normalizeSettings({ format: "open", count: 999, scenarioMode: false }).count).toBe(5);
+    expect(normalizeSettings({ format: "open", count: -1, scenarioMode: false }).count).toBe(5);
+    expect(normalizeSettings({ format: "open", count: "5", scenarioMode: false }).count).toBe(5); // string, not number
   });
 
   it("normalizes one valid field even if the other is invalid", () => {
-    const result = normalizeSettings({ format: "open", count: 999 });
+    const result = normalizeSettings({ format: "open", count: 999, scenarioMode: false });
     expect(result.format).toBe("open");
     expect(result.count).toBe(5);
+    expect(result.scenarioMode).toBe(false);
   });
 });
 

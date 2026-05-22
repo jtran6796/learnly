@@ -1,3 +1,7 @@
 name = "learnly-backend"
 main = "worker.js"
 compatibility_date = "2026-05-07"
+
+[[kv_namespaces]]
+binding = "LEARNLY_CACHE"
+id = "73af8b25eff547bdbffa24732c90a68a"

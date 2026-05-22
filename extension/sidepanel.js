@@ -1,5 +1,10 @@
 import { BACKEND_URL } from "./lib/config.js";
-import { getSettings, setSetting, resetSettings, DEFAULTS } from "./lib/settings.js";
+import {
+  getSettings,
+  setSetting,
+  resetSettings,
+  DEFAULTS,
+} from "./lib/settings.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -35,14 +40,18 @@ function clearOutput() {
 }
 
 // ---------- Settings panel ----------
-
+const scenarioToggle = $("scenario-toggle");
 function applySettingsToUI(settings) {
   document.querySelectorAll('input[name="format"]').forEach((el) => {
     el.checked = el.value === settings.format;
   });
   countSlider.value = String(settings.count);
   countValue.textContent = String(settings.count);
+  scenarioToggle.checked = settings.scenarioMode;
 }
+scenarioToggle.addEventListener("change", (e) => {
+  setSetting("scenarioMode", e.target.checked);
+});
 
 function toggleSettingsPanel() {
   const isOpen = !settingsPanel.classList.contains("hidden");
@@ -81,7 +90,8 @@ resetBtn.addEventListener("click", async () => {
 
 function detectMode(url) {
   if (!url) return "article";
-  if (/^https?:\/\/(www\.)?youtube\.com\/watch/.test(url)) return "topic_youtube";
+  if (/^https?:\/\/(www\.)?youtube\.com\/watch/.test(url))
+    return "topic_youtube";
   return "article";
 }
 
@@ -124,7 +134,9 @@ function setMetaForMode(extracted, mode) {
       : extracted.topic;
   } else {
     metaMode.textContent =
-      extracted.mode === "selection" ? "From your selection" : "From the article";
+      extracted.mode === "selection"
+        ? "From your selection"
+        : "From the article";
     metaTitle.textContent = extracted.title;
   }
   metaEl.classList.remove("hidden");
@@ -270,10 +282,18 @@ generateBtn.addEventListener("click", async () => {
 
     const mode = detectMode(tab.url);
     const extracted = await extractFromTab(tab.id, mode);
-    console.log("[generate] extracted URL:", extracted._url, "actual tab URL:", tab.url);
+    console.log(
+      "[generate] extracted URL:",
+      extracted._url,
+      "actual tab URL:",
+      tab.url,
+    );
     console.log("extracted:", extracted, "mode:", mode);
     if (!extracted || extracted.mode === "error") {
-      throw new Error(extracted?.error || `Extraction failed. Mode: ${mode}. Got: ${JSON.stringify(extracted)}`);
+      throw new Error(
+        extracted?.error ||
+          `Extraction failed. Mode: ${mode}. Got: ${JSON.stringify(extracted)}`,
+      );
     }
 
     setMetaForMode(extracted, mode);
@@ -285,7 +305,8 @@ generateBtn.addEventListener("click", async () => {
     if (mode === "topic_youtube") {
       const contextParts = [];
       if (extracted.channel) contextParts.push(`Channel: ${extracted.channel}`);
-      if (extracted.description) contextParts.push(`Description excerpt: ${extracted.description}`);
+      if (extracted.description)
+        contextParts.push(`Description excerpt: ${extracted.description}`);
       payload = {
         mode: "topic",
         topic: extracted.topic,

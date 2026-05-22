@@ -49,7 +49,10 @@ header h1 {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s ease, color 0.15s ease, transform 0.2s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    transform 0.2s ease;
 }
 
 .icon-btn:hover {
@@ -339,7 +342,9 @@ input[type="range"] {
   border-radius: 6px;
   font-size: 13px;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .mc-option:hover {
@@ -360,4 +365,17 @@ input[type="range"] {
 .mc-option.mc-incorrect {
   background: #fef2f2;
   border-color: #dc2626;
+}
+.checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.checkbox-option input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
 }

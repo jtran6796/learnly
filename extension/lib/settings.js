@@ -4,6 +4,7 @@
 const DEFAULTS = Object.freeze({
   format: "mix", // "open" | "multiple_choice" | "mix"
   count: 5, // 3 | 5 | 7
+  scenarioMode: false, // true | false
 });
 
 export async function getSettings() {

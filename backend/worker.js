@@ -213,6 +213,7 @@ async function generateQuestions({
   topic,
   context,
   settings,
+  seenConcepts = [],
   apiKey,
 }) {
   let systemPrompt;
@@ -333,7 +334,7 @@ export default {
           topic,
           context,
           settings,
-          seenConcepts: [],
+          seenConcepts,
           apiKey: env.ANTHROPIC_API_KEY,
         });
         if (env.LEARNLY_CACHE) {
@@ -371,7 +372,7 @@ export default {
           mode,
           content,
           settings,
-          seenConcepts: [],
+          seenConcepts,
           apiKey: env.ANTHROPIC_API_KEY,
         });
         if (env.LEARNLY_CACHE) {

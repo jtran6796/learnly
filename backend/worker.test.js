@@ -165,4 +165,12 @@ describe("hashKey", () => {
     const result = await hashKey("");
     expect(result).toMatch(/^[0-9a-f]{32}$/);
   });
+  
+  it("treats input as raw string (no normalization)", async () => {
+    const a = await hashKey("topic|context|open|5");
+    const b = await hashKey("topic|context|open|5");
+    const c = await hashKey("topic|context|open|7");
+    expect(a).toBe(b);
+    expect(a).not.toBe(c);
+  });
 });

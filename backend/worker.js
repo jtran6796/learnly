@@ -17,7 +17,7 @@ Distribute questions based on format:
 - "multiple_choice" → 50/50 recall and flashcard, NO socratic. For 5: 3/2 or 2/3. For 3: 2/1. For 7: 4/3.
 
 FORMAT rules:
-- "open" → all questions are open-ended (single answer field).
+- "open" → all questions are open-ended.
 - "multiple_choice" → recall and flashcard questions are MC. Socratic stays open-ended.
 - "mix" → roughly half MC and half open, distributed across types. Socratic always open-ended.
 
@@ -30,28 +30,35 @@ For MULTIPLE CHOICE questions:
 For OPEN-ENDED questions:
 - "answer" is the answer the student should arrive at.
 
+CONCEPT LABELS (every question requires one):
+- Each question must include a "concept" field: a short label (2-6 words) naming the underlying idea being tested.
+- Be consistent: the same underlying concept should always get the same label, even across batches.
+- Granularity: specific enough to be useful for coverage tracking, general enough that related questions share a label.
+  - Good: "Principle of least privilege", "TCP three-way handshake", "Mitochondrial function"
+  - Too granular: "Least privilege definition", "Least privilege example", "Least privilege failures"
+  - Too broad: "Security", "Networking", "Cell biology"
+- Use Title Case for concept labels.
+
+TOPIC COVERAGE (at the response level):
+Include a top-level "topicCoverage" field with value "ongoing" or "well_covered":
+- "ongoing": more important concepts remain to explore for this topic.
+- "well_covered": you have surveyed the major concepts; further questions would mostly cover edge cases, secondary details, or review.
+For an initial generation (no previously-seen concepts), this will almost always be "ongoing".
+
 General rules:
 - Questions must be answerable from the text (except Socratic, which extends from it).
 - Avoid trivia. Focus on important ideas, mechanisms, relationships.
 - Keep questions clear and one sentence where possible.
 
-SCENARIO MODE:
-The user may request "scenario-based" questions. When scenario mode is enabled:
-- Frame recall and flashcard questions as realistic situations a student would encounter in the field, not direct definitions.
-- Example direct: "What is the principle of least privilege?"
-  Example scenario: "Maya is setting up access for a new contractor who needs read access to one specific database. Which security principle should guide her permission decisions?"
-- Scenarios should be plausible, professional, and avoid silly or contrived setups.
-- Use varied, generic names (Alex, Priya, Marcus, Yuki, Sam, Maria, etc.) — don't reuse the same names across questions.
-- DO NOT force scenarios where they don't fit naturally. For purely definitional topics (biology terms, math concepts, historical dates), it's fine to keep questions direct even in scenario mode — but try to add real-world framing where you can.
-- Socratic questions (when present) are unaffected by scenario mode.
-
 Respond ONLY with a JSON object, no preamble, no markdown fences:
 
 {
+  "topicCoverage": "ongoing" | "well_covered",
   "questions": [
     {
       "type": "recall" | "flashcard" | "socratic",
       "format": "open" | "multiple_choice",
+      "concept": "Short concept label",
       "question": "...",
       "options": ["correct", "distractor", "distractor", "distractor"],
       "correctIndex": 0,
@@ -93,23 +100,30 @@ For MULTIPLE CHOICE:
 For OPEN-ENDED:
 - "answer" is the answer the student should arrive at.
 
-SCENARIO MODE:
-The user may request "scenario-based" questions. When scenario mode is enabled:
-- Frame recall and flashcard questions as realistic situations a student would encounter in the field, not direct definitions.
-- Example direct: "What is the principle of least privilege?"
-  Example scenario: "Maya is setting up access for a new contractor who needs read access to one specific database. Which security principle should guide her permission decisions?"
-- Scenarios should be plausible, professional, and avoid silly or contrived setups.
-- Use varied, generic names (Alex, Priya, Marcus, Yuki, Sam, Maria, etc.) — don't reuse the same names across questions.
-- DO NOT force scenarios where they don't fit naturally. For purely definitional topics (biology terms, math concepts, historical dates), it's fine to keep questions direct even in scenario mode — but try to add real-world framing where you can.
-- Socratic questions (when present) are unaffected by scenario mode.
+CONCEPT LABELS (every question requires one):
+- Each question must include a "concept" field: a short label (2-6 words) naming the underlying idea being tested.
+- Be consistent across batches: the same underlying concept gets the same label every time.
+- Granularity: specific enough to track coverage, general enough that related questions share a label.
+  - Good: "Zero Trust Architecture", "Adaptive Identity", "Policy Enforcement Points"
+  - Too granular: "PEP definition", "PEP placement diagram"
+  - Too broad: "Security", "Cybersecurity"
+- Use Title Case.
+
+TOPIC COVERAGE (at the response level):
+Include a top-level "topicCoverage" field:
+- "ongoing": more important concepts about this topic remain to explore.
+- "well_covered": major concepts surveyed; further questions would be edge cases or review.
+For an initial generation, this is almost always "ongoing".
 
 Respond ONLY with JSON, no preamble or markdown fences:
 
 {
+  "topicCoverage": "ongoing" | "well_covered",
   "questions": [
     {
       "type": "recall" | "flashcard" | "socratic",
       "format": "open" | "multiple_choice",
+      "concept": "Short concept label",
       "question": "...",
       "options": ["correct", "distractor", "distractor", "distractor"],
       "correctIndex": 0,
@@ -167,7 +181,8 @@ function normalizeSettings(raw) {
   if (raw && typeof raw === "object") {
     if (ALLOWED_FORMATS.includes(raw.format)) settings.format = raw.format;
     if (ALLOWED_COUNTS.includes(raw.count)) settings.count = raw.count;
-    if (typeof raw.scenarioMode === "boolean") settings.scenarioMode = raw.scenarioMode;
+    if (typeof raw.scenarioMode === "boolean")
+      settings.scenarioMode = raw.scenarioMode;
   }
   return settings;
 }
@@ -202,7 +217,9 @@ async function generateQuestions({
 }) {
   let systemPrompt;
   let userMessage;
-  const scenarioLine = settings.scenarioMode ? "\nUse scenario-based questions (realistic situations) where appropriate." : "";
+  const scenarioLine = settings.scenarioMode
+    ? "\nUse scenario-based questions (realistic situations) where appropriate."
+    : "";
 
   if (mode === "topic") {
     systemPrompt = TOPIC_SYSTEM_PROMPT;
@@ -242,7 +259,12 @@ async function generateQuestions({
   if (!Array.isArray(parsed.questions) || parsed.questions.length === 0) {
     throw new Error("Model returned no questions");
   }
-  return parsed.questions.map(shuffleMultipleChoice);
+  const topicCoverage =
+    parsed.topicCoverage === "well_covered" ? "well_covered" : "ongoing";
+  return {
+    questions: parsed.questions.map(shuffleMultipleChoice),
+    topicCoverage,
+  };
 }
 
 export default {
@@ -281,18 +303,16 @@ export default {
       if (topic.length < 3) {
         return jsonResponse({ error: "Topic is too short or missing." }, 400);
       }
-      cacheKey = `q:topic:${await hashKey(`${topic}|${context}|${settings.format}|${settings.count}|${settings.scenarioMode}`)}`;
-
+      cacheKey = `q:article:v2:${await hashKey(`${settings.format}|${settings.count}|${content}`)}`;
       try {
         if (env.LEARNLY_CACHE) {
           const cached = await env.LEARNLY_CACHE.get(cacheKey);
-          if (cached)
-            return jsonResponse({
-              questions: JSON.parse(cached),
-              cached: true,
-            });
+          if (cached) {
+            const parsedCache = JSON.parse(cached);
+            return jsonResponse({ ...parsedCache, cached: true });
+          }
         }
-        const questions = await generateQuestions({
+        const result = await generateQuestions({
           mode,
           topic,
           context,
@@ -300,11 +320,11 @@ export default {
           apiKey: env.ANTHROPIC_API_KEY,
         });
         if (env.LEARNLY_CACHE) {
-          await env.LEARNLY_CACHE.put(cacheKey, JSON.stringify(questions), {
+          await env.LEARNLY_CACHE.put(cacheKey, JSON.stringify(result), {
             expirationTtl: 60 * 60 * 24 * 7,
           });
         }
-        return jsonResponse({ questions, cached: false });
+        return jsonResponse({ ...result, cached: false });
       } catch (err) {
         console.error("topic generation failed:", err);
         return jsonResponse({ error: "Failed to generate questions" }, 500);
@@ -320,16 +340,15 @@ export default {
           400,
         );
       }
-      cacheKey = `q:article:${await hashKey(`${settings.format}|${settings.count}|${settings.scenarioMode}|${content}`)}`;
+      cacheKey = `q:article:v2:${await hashKey(`${settings.format}|${settings.count}|${content}`)}`;
 
       try {
         if (env.LEARNLY_CACHE) {
           const cached = await env.LEARNLY_CACHE.get(cacheKey);
-          if (cached)
-            return jsonResponse({
-              questions: JSON.parse(cached),
-              cached: true,
-            });
+          if (cached) {
+            const parsedCache = JSON.parse(cached);
+            return jsonResponse({ ...parsedCache, cached: true });
+          }
         }
         const questions = await generateQuestions({
           mode,

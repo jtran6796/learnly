@@ -303,7 +303,7 @@ export default {
       if (topic.length < 3) {
         return jsonResponse({ error: "Topic is too short or missing." }, 400);
       }
-      cacheKey = `q:article:v2:${await hashKey(`${settings.format}|${settings.count}|${content}`)}`;
+      cacheKey = `q:topic:v2:${await hashKey(`${topic}|${context}|${settings.format}|${settings.count}`)}`;
       try {
         if (env.LEARNLY_CACHE) {
           const cached = await env.LEARNLY_CACHE.get(cacheKey);
@@ -350,18 +350,18 @@ export default {
             return jsonResponse({ ...parsedCache, cached: true });
           }
         }
-        const questions = await generateQuestions({
+        const result = await generateQuestions({
           mode,
           content,
           settings,
           apiKey: env.ANTHROPIC_API_KEY,
         });
         if (env.LEARNLY_CACHE) {
-          await env.LEARNLY_CACHE.put(cacheKey, JSON.stringify(questions), {
+          await env.LEARNLY_CACHE.put(cacheKey, JSON.stringify(result), {
             expirationTtl: 60 * 60 * 24 * 7,
           });
         }
-        return jsonResponse({ questions, cached: false });
+        return jsonResponse({ ...result, cached: false });
       } catch (err) {
         console.error("article generation failed:", err);
         return jsonResponse({ error: "Failed to generate questions" }, 500);

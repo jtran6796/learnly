@@ -29,6 +29,7 @@ const trackerCount = $("tracker-count");
 const trackerPills = $("tracker-pills");
 const moreActions = $("more-actions");
 const moreBtn = $("more-btn");
+const coverageBanner = $("coverage-banner");
 
 function setStatus(text, isError = false) {
   if (!text) {
@@ -44,6 +45,7 @@ function clearOutput() {
   questionsEl.innerHTML = "";
   metaEl.classList.add("hidden");
   clearTracker();
+  coverageBanner.classList.add("hidden");
   moreActions.classList.add("hidden");
   lastRequestPayload = null;
   setStatus("");
@@ -99,6 +101,7 @@ resetBtn.addEventListener("click", async () => {
 // ---------- Concept tracker ----------
 
 const seenConceptLabels = new Map(); // normalized key → original label
+let lastRequestPayload = null;
 
 function normalizeConcept(label) {
   return label.trim().toLowerCase();
@@ -405,8 +408,10 @@ moreBtn.addEventListener("click", async () => {
     renderQuestions(questions, { append: true });
 
     if (topicCoverage === "well_covered") {
-      setStatus("You've covered the major concepts for this topic.");
+      coverageBanner.classList.remove("hidden");
+      setStatus("");
     } else {
+      coverageBanner.classList.add("hidden");
       setStatus(cached ? "Loaded from cache." : "");
       setTimeout(() => setStatus(""), 2000);
     }

@@ -451,3 +451,46 @@ button.primary.secondary {
 button.primary.secondary:hover:not(:disabled) {
   background: rgba(91, 79, 207, 0.08);
 }
+
+.coverage-banner {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: #ecfdf5;
+  border: 1px solid #16a34a;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: fadeIn 0.25s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.coverage-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: #16a34a;
+  color: white;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.coverage-text {
+  font-size: 13px;
+  color: #14532d;
+  line-height: 1.4;
+}

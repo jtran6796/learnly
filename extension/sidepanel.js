@@ -42,6 +42,7 @@ function setStatus(text, isError = false) {
 }
 
 function clearOutput() {
+  console.log("[clearOutput] running, banner hidden=", coverageBanner.classList.contains("hidden"));
   questionsEl.innerHTML = "";
   metaEl.classList.add("hidden");
   clearTracker();
@@ -49,6 +50,7 @@ function clearOutput() {
   moreActions.classList.add("hidden");
   lastRequestPayload = null;
   setStatus("");
+  console.log("[clearOutput] done, banner hidden=", coverageBanner.classList.contains("hidden"));
 }
 
 // ---------- Settings panel ----------
@@ -337,20 +339,18 @@ generateBtn.addEventListener("click", async () => {
       throw new Error("Can't run on this page. Try a regular website.");
     }
 
+    const requestedAtUrl = tab.url;
+
     const mode = detectMode(tab.url);
     const extracted = await extractFromTab(tab.id, mode);
-    console.log(
-      "[generate] extracted URL:",
-      extracted._url,
-      "actual tab URL:",
-      tab.url,
-    );
-    console.log("extracted:", extracted, "mode:", mode);
     if (!extracted || extracted.mode === "error") {
-      throw new Error(
-        extracted?.error ||
-          `Extraction failed. Mode: ${mode}. Got: ${JSON.stringify(extracted)}`,
-      );
+      throw new Error(extracted?.error || "Extraction failed.");
+    }
+
+    // Bail if user navigated away during extraction
+    if (requestedAtUrl !== currentUrl) {
+      console.log("[generateBtn] stale extraction, dropping");
+      return;
     }
 
     setMetaForMode(extracted, mode);
@@ -362,8 +362,7 @@ generateBtn.addEventListener("click", async () => {
     if (mode === "topic_youtube") {
       const contextParts = [];
       if (extracted.channel) contextParts.push(`Channel: ${extracted.channel}`);
-      if (extracted.description)
-        contextParts.push(`Description excerpt: ${extracted.description}`);
+      if (extracted.description) contextParts.push(`Description excerpt: ${extracted.description}`);
       payload = {
         mode: "topic",
         topic: extracted.topic,
@@ -378,10 +377,24 @@ generateBtn.addEventListener("click", async () => {
       };
     }
 
-    const { questions, cached } = await generateQuestions(payload);
+    const { questions, cached, topicCoverage } = await generateQuestions(payload);
+
+    // Bail if user navigated away during generation
+    if (requestedAtUrl !== currentUrl) {
+      console.log("[generateBtn] stale response, dropping");
+      return;
+    }
+
     renderQuestions(questions);
     lastRequestPayload = payload;
     moreActions.classList.remove("hidden");
+
+    if (topicCoverage === "well_covered") {
+      coverageBanner.classList.remove("hidden");
+    } else {
+      coverageBanner.classList.add("hidden");
+    }
+
     setStatus(cached ? "Loaded from cache." : "");
     setTimeout(() => setStatus(""), 2000);
   } catch (err) {
@@ -395,6 +408,8 @@ generateBtn.addEventListener("click", async () => {
 moreBtn.addEventListener("click", async () => {
   if (!lastRequestPayload) return;
 
+  const requestedAtUrl = currentUrl;  // remember which page this was for
+
   moreBtn.disabled = true;
   setStatus("Generating more questions…");
 
@@ -403,8 +418,14 @@ moreBtn.addEventListener("click", async () => {
       ...lastRequestPayload,
       seenConcepts: getSeenConceptList(),
     };
-    const { questions, cached, topicCoverage } =
-      await generateQuestions(payload);
+    const { questions, cached, topicCoverage } = await generateQuestions(payload);
+
+    // If user navigated away while waiting, abandon this result
+    if (requestedAtUrl !== currentUrl) {
+      console.log("[moreBtn] stale response, dropping");
+      return;
+    }
+
     renderQuestions(questions, { append: true });
 
     if (topicCoverage === "well_covered") {

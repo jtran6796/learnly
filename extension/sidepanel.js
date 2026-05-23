@@ -98,8 +98,7 @@ resetBtn.addEventListener("click", async () => {
 
 // ---------- Concept tracker ----------
 
-const seenConcepts = new Set();
-let lastRequestPayload = null; // remembers the last successful request shape, used by "Generate more"
+const seenConceptLabels = new Map(); // normalized key → original label
 
 function normalizeConcept(label) {
   return label.trim().toLowerCase();
@@ -108,22 +107,26 @@ function normalizeConcept(label) {
 function addConcept(label) {
   if (!label) return;
   const key = normalizeConcept(label);
-  if (seenConcepts.has(key)) return;
-  seenConcepts.add(key);
+  if (seenConceptLabels.has(key)) return;
+  seenConceptLabels.set(key, label);
 
   const pill = document.createElement("span");
   pill.className = "tracker-pill";
   pill.textContent = label;
   trackerPills.appendChild(pill);
-  trackerCount.textContent = String(seenConcepts.size);
+  trackerCount.textContent = String(seenConceptLabels.size);
   conceptTracker.classList.remove("hidden");
 }
 
 function clearTracker() {
-  seenConcepts.clear();
+  seenConceptLabels.clear();
   trackerPills.innerHTML = "";
   trackerCount.textContent = "0";
   conceptTracker.classList.add("hidden");
+}
+
+function getSeenConceptList() {
+  return Array.from(seenConceptLabels.values());
 }
 
 // ---------- Generate flow ----------
@@ -393,10 +396,20 @@ moreBtn.addEventListener("click", async () => {
   setStatus("Generating more questions…");
 
   try {
-    const { questions, cached } = await generateQuestions(lastRequestPayload);
+    const payload = {
+      ...lastRequestPayload,
+      seenConcepts: getSeenConceptList(),
+    };
+    const { questions, cached, topicCoverage } =
+      await generateQuestions(payload);
     renderQuestions(questions, { append: true });
-    setStatus(cached ? "Loaded from cache." : "");
-    setTimeout(() => setStatus(""), 2000);
+
+    if (topicCoverage === "well_covered") {
+      setStatus("You've covered the major concepts for this topic.");
+    } else {
+      setStatus(cached ? "Loaded from cache." : "");
+      setTimeout(() => setStatus(""), 2000);
+    }
   } catch (err) {
     console.error(err);
     setStatus(err.message || "Something went wrong.", true);

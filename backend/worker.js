@@ -217,6 +217,9 @@ async function generateQuestions({
 }) {
   let systemPrompt;
   let userMessage;
+  const seenLine = seenConcepts.length
+    ? `\n\nThe user has already seen questions covering these concepts:\n${seenConcepts.map((c) => `- ${c}`).join("\n")}\n\nGenerate questions on DIFFERENT concepts. If you can find genuinely new important concepts at this level: do so and mark topicCoverage as "ongoing". If most important concepts are already covered: still generate the requested ${settings.count} questions (covering secondary points or review angles), but mark topicCoverage as "well_covered".`
+    : "";
   const scenarioLine = settings.scenarioMode
     ? "\nUse scenario-based questions (realistic situations) where appropriate."
     : "";
@@ -224,11 +227,11 @@ async function generateQuestions({
   if (mode === "topic") {
     systemPrompt = TOPIC_SYSTEM_PROMPT;
     const contextLine = context ? `\nContext: ${context}` : "";
-    userMessage = `Generate ${settings.count} study questions in "${settings.format}" format on this topic:${scenarioLine}\n\nTopic: ${topic}${contextLine}`;
+    userMessage = `Generate ${settings.count} study questions in "${settings.format}" format on this topic:${scenarioLine}\n\nTopic: ${topic}${contextLine}${seenLine}`;
   } else {
     systemPrompt = ARTICLE_SYSTEM_PROMPT;
     const trimmed = content.length > 12000 ? content.slice(0, 12000) : content;
-    userMessage = `Generate ${settings.count} study questions in "${settings.format}" format for the following content:${scenarioLine}\n\n${trimmed}`;
+    userMessage = `Generate ${settings.count} study questions in "${settings.format}" format for the following content:${scenarioLine}\n\n${trimmed}${seenLine}`;
   }
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -295,6 +298,11 @@ export default {
       ? payload.mode
       : "article";
     const settings = normalizeSettings(payload.settings);
+    const seenConcepts = Array.isArray(payload.seenConcepts)
+      ? payload.seenConcepts
+          .filter((c) => typeof c === "string" && c.trim().length > 0)
+          .slice(0, 100) // cap to prevent abuse / huge prompts
+      : [];
 
     let cacheKey;
     if (mode === "topic") {
@@ -303,7 +311,15 @@ export default {
       if (topic.length < 3) {
         return jsonResponse({ error: "Topic is too short or missing." }, 400);
       }
-      cacheKey = `q:topic:v2:${await hashKey(`${topic}|${context}|${settings.format}|${settings.count}`)}`;
+      const seenHash = seenConcepts.length
+        ? await hashKey(
+            seenConcepts
+              .map((c) => c.trim().toLowerCase())
+              .sort()
+              .join("|"),
+          )
+        : "none";
+      cacheKey = `q:topic:v3:${await hashKey(`${topic}|${context}|${settings.format}|${settings.count}|${seenHash}`)}`;
       try {
         if (env.LEARNLY_CACHE) {
           const cached = await env.LEARNLY_CACHE.get(cacheKey);
@@ -317,6 +333,7 @@ export default {
           topic,
           context,
           settings,
+          seenConcepts = [],
           apiKey: env.ANTHROPIC_API_KEY,
         });
         if (env.LEARNLY_CACHE) {
@@ -340,7 +357,7 @@ export default {
           400,
         );
       }
-      cacheKey = `q:article:v2:${await hashKey(`${settings.format}|${settings.count}|${content}`)}`;
+      cacheKey = `q:article:v3:${await hashKey(`${settings.format}|${settings.count}|${seenHash}|${content}`)}`;
 
       try {
         if (env.LEARNLY_CACHE) {
@@ -354,6 +371,7 @@ export default {
           mode,
           content,
           settings,
+          seenConcepts = [],
           apiKey: env.ANTHROPIC_API_KEY,
         });
         if (env.LEARNLY_CACHE) {

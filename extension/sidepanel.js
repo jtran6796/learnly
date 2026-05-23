@@ -27,6 +27,8 @@ const resetBtn = $("reset-settings");
 const conceptTracker = $("concept-tracker");
 const trackerCount = $("tracker-count");
 const trackerPills = $("tracker-pills");
+const moreActions = $("more-actions");
+const moreBtn = $("more-btn");
 
 function setStatus(text, isError = false) {
   if (!text) {
@@ -42,6 +44,8 @@ function clearOutput() {
   questionsEl.innerHTML = "";
   metaEl.classList.add("hidden");
   clearTracker();
+  moreActions.classList.add("hidden");
+  lastRequestPayload = null;
   setStatus("");
 }
 
@@ -95,6 +99,7 @@ resetBtn.addEventListener("click", async () => {
 // ---------- Concept tracker ----------
 
 const seenConcepts = new Set();
+let lastRequestPayload = null; // remembers the last successful request shape, used by "Generate more"
 
 function normalizeConcept(label) {
   return label.trim().toLowerCase();
@@ -184,8 +189,11 @@ async function updateGenerateButton() {
     mode === "topic_youtube" ? "Quiz me on this topic" : "Generate questions";
 }
 
-function renderQuestions(questions) {
-  questionsEl.innerHTML = "";
+function renderQuestions(questions, { append = false } = {}) {
+  if (!append) {
+    questionsEl.innerHTML = "";
+  }
+
   questions.forEach((q) => {
     const card = document.createElement("div");
     card.className = "question-card";
@@ -366,6 +374,8 @@ generateBtn.addEventListener("click", async () => {
 
     const { questions, cached } = await generateQuestions(payload);
     renderQuestions(questions);
+    lastRequestPayload = payload;
+    moreActions.classList.remove("hidden");
     setStatus(cached ? "Loaded from cache." : "");
     setTimeout(() => setStatus(""), 2000);
   } catch (err) {
@@ -373,6 +383,25 @@ generateBtn.addEventListener("click", async () => {
     setStatus(err.message || "Something went wrong.", true);
   } finally {
     generateBtn.disabled = false;
+  }
+});
+
+moreBtn.addEventListener("click", async () => {
+  if (!lastRequestPayload) return;
+
+  moreBtn.disabled = true;
+  setStatus("Generating more questions…");
+
+  try {
+    const { questions, cached } = await generateQuestions(lastRequestPayload);
+    renderQuestions(questions, { append: true });
+    setStatus(cached ? "Loaded from cache." : "");
+    setTimeout(() => setStatus(""), 2000);
+  } catch (err) {
+    console.error(err);
+    setStatus(err.message || "Something went wrong.", true);
+  } finally {
+    moreBtn.disabled = false;
   }
 });
 

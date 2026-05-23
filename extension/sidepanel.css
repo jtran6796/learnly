@@ -435,3 +435,19 @@ input[type="range"] {
   border-radius: 999px;
   font-weight: 500;
 }
+
+.more-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+button.primary.secondary {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+button.primary.secondary:hover:not(:disabled) {
+  background: rgba(91, 79, 207, 0.08);
+}

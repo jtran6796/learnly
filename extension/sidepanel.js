@@ -23,6 +23,11 @@ const countSlider = $("count-slider");
 const countValue = $("count-value");
 const resetBtn = $("reset-settings");
 
+// tracker logic
+const conceptTracker = $("concept-tracker");
+const trackerCount = $("tracker-count");
+const trackerPills = $("tracker-pills");
+
 function setStatus(text, isError = false) {
   if (!text) {
     statusEl.classList.add("hidden");
@@ -36,6 +41,7 @@ function setStatus(text, isError = false) {
 function clearOutput() {
   questionsEl.innerHTML = "";
   metaEl.classList.add("hidden");
+  clearTracker();
   setStatus("");
 }
 
@@ -85,6 +91,35 @@ resetBtn.addEventListener("click", async () => {
   const fresh = await resetSettings();
   applySettingsToUI(fresh);
 });
+
+// ---------- Concept tracker ----------
+
+const seenConcepts = new Set();
+
+function normalizeConcept(label) {
+  return label.trim().toLowerCase();
+}
+
+function addConcept(label) {
+  if (!label) return;
+  const key = normalizeConcept(label);
+  if (seenConcepts.has(key)) return;
+  seenConcepts.add(key);
+
+  const pill = document.createElement("span");
+  pill.className = "tracker-pill";
+  pill.textContent = label;
+  trackerPills.appendChild(pill);
+  trackerCount.textContent = String(seenConcepts.size);
+  conceptTracker.classList.remove("hidden");
+}
+
+function clearTracker() {
+  seenConcepts.clear();
+  trackerPills.innerHTML = "";
+  trackerCount.textContent = "0";
+  conceptTracker.classList.add("hidden");
+}
 
 // ---------- Generate flow ----------
 
@@ -170,6 +205,7 @@ function renderQuestions(questions) {
       conceptPill.className = "concept-pill";
       conceptPill.textContent = q.concept;
       card.appendChild(conceptPill);
+      addConcept(q.concept);
     }
 
     if (q.format === "multiple_choice") {

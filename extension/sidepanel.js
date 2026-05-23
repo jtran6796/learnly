@@ -217,10 +217,6 @@ function renderQuestions(questions, { append = false } = {}) {
     card.appendChild(qText);
 
     if (q.concept) {
-      const conceptPill = document.createElement("span");
-      conceptPill.className = "concept-pill";
-      conceptPill.textContent = q.concept;
-      card.appendChild(conceptPill);
       addConcept(q.concept);
     }
 
@@ -264,6 +260,13 @@ function renderOpenEnded(card, q) {
   revealBtn.addEventListener("click", () => {
     const hidden = answer.classList.toggle("hidden");
     revealBtn.textContent = hidden ? "Show answer" : "Hide answer";
+    
+    if (!hidden && !card.querySelector(".concept-pill") && q.concept) {
+    const conceptPill = document.createElement("span");
+    conceptPill.className = "concept-pill";
+    conceptPill.textContent = q.concept;
+    answer.before(conceptPill);
+  }
   });
 }
 
@@ -323,6 +326,12 @@ function renderMultipleChoice(card, q) {
     verdict.textContent = correct ? "Correct! " : "Not quite. ";
     result.appendChild(verdict);
     result.appendChild(document.createTextNode(q.answer));
+    if (q.concept && !card.querySelector(".concept-pill")) {
+      const conceptPill = document.createElement("span");
+      conceptPill.className = "concept-pill";
+      conceptPill.textContent = q.concept;
+      result.before(conceptPill);
+    }
     result.classList.remove("hidden");
     checkBtn.disabled = true;
   });

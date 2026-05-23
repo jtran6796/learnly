@@ -165,6 +165,13 @@ function renderQuestions(questions) {
     qText.textContent = q.question;
     card.appendChild(qText);
 
+    if (q.concept) {
+      const conceptPill = document.createElement("span");
+      conceptPill.className = "concept-pill";
+      conceptPill.textContent = q.concept;
+      card.appendChild(conceptPill);
+    }
+
     if (q.format === "multiple_choice") {
       renderMultipleChoice(card, q);
     } else {
